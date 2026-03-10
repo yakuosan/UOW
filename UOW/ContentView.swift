@@ -5,49 +5,34 @@ struct ContentView: View {
 
     var body: some View {
         TabView {
-            HomeView()
-                .environmentObject(store)
-                .tabItem {
-                    Label("ホーム", systemImage: "house.fill")
-                }
+            NavigationStack {
+                HomeView()
+                    .environmentObject(store)
+            }
+            .tabItem { Label("ホーム", systemImage: "house.fill") }
 
-            RankingView()
-                .tabItem {
-                    Label("ランキング", systemImage: "trophy.fill")
-                }
+            NavigationStack {
+                RankingView()
+                    .environmentObject(store)
+            }
+            .tabItem { Label("ランキング", systemImage: "trophy.fill") }
 
-            CharacterView()
-                .tabItem {
-                    Label("キャラクター", systemImage: "face.smiling.inverse")
-                }
+            NavigationStack {
+                CharacterView()
+            }
+            .tabItem { Label("キャラクター", systemImage: "face.smiling.inverse") }
 
-            StatsView()
-                .tabItem {
-                    Label("統計", systemImage: "chart.bar.fill")
-                }
+            NavigationStack {
+                StatsView()
+                    .environmentObject(store)
+            }
+            .tabItem { Label("統計", systemImage: "chart.bar.fill") }
         }
         .tint(Color(hex: "5B8DEF"))
     }
 }
 
-// MARK: - プレースホルダー画面
-
-struct RankingView: View {
-    var body: some View {
-        ZStack {
-            Color(hex: "FAF7F2").ignoresSafeArea()
-            VStack(spacing: 12) {
-                Image(systemName: "trophy.fill")
-                    .font(.system(size: 48))
-                    .foregroundColor(Color(hex: "E8B84B"))
-                Text("ランキング")
-                    .font(.title2.bold())
-                Text("Coming Soon")
-                    .foregroundColor(.secondary)
-            }
-        }
-    }
-}
+// MARK: - キャラクタープレースホルダー
 
 struct CharacterView: View {
     var body: some View {
@@ -63,23 +48,7 @@ struct CharacterView: View {
                     .foregroundColor(.secondary)
             }
         }
-    }
-}
-
-struct StatsView: View {
-    var body: some View {
-        ZStack {
-            Color(hex: "FAF7F2").ignoresSafeArea()
-            VStack(spacing: 12) {
-                Image(systemName: "chart.bar.fill")
-                    .font(.system(size: 48))
-                    .foregroundColor(Color(hex: "5B8DEF"))
-                Text("統計")
-                    .font(.title2.bold())
-                Text("Coming Soon")
-                    .foregroundColor(.secondary)
-            }
-        }
+        .navigationTitle("キャラクター")
     }
 }
 

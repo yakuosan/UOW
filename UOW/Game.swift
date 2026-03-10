@@ -5,16 +5,31 @@ struct Game: Identifiable, Codable {
     let id: UUID
     var name: String
     var imageName: String
+    var imageURL: String?        // Steam等から取得した実際の画像URL
     var sessions: [GameSession]
 
-    init(name: String, imageName: String) {
+    init(name: String, imageName: String = "gamecontroller.fill", imageURL: String? = nil) {
         self.id = UUID()
         self.name = name
         self.imageName = imageName
+        self.imageURL = imageURL
         self.sessions = []
     }
 
-    // 過去セッションの平均スコア（セッションなしはnil）
+    // 旧データ（imageURLなし）でもデコードできるよう明示的に実装
+    enum CodingKeys: String, CodingKey {
+        case id, name, imageName, imageURL, sessions
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id       = try c.decode(UUID.self,          forKey: .id)
+        name     = try c.decode(String.self,         forKey: .name)
+        imageName = try c.decode(String.self,        forKey: .imageName)
+        imageURL = try c.decodeIfPresent(String.self, forKey: .imageURL)
+        sessions = try c.decode([GameSession].self,  forKey: .sessions)
+    }
+
     var averageScore: Double? {
         guard !sessions.isEmpty else { return nil }
         return sessions.map(\.peakScore).reduce(0, +) / Double(sessions.count)
@@ -29,20 +44,5 @@ struct Game: Identifiable, Codable {
         default:      return Color(hex: "F5A5A5")
         }
     }
-}
-
-// サンプルデータ（sessions空 = プレイ記録なし）
-extension Game {
-    static let samples: [Game] = [
-        {
-            var g = Game(name: "スマブラ", imageName: "figure.martial.arts")
-            g.sessions = [
-                GameSession(peakScore: 75, wordCount: 8, impactCount: 3),
-                GameSession(peakScore: 65, wordCount: 5, impactCount: 2),
-            ]
-            return g
-        }(),
-        Game(name: "valorant", imageName: "scope"),
-    ]
 }
 

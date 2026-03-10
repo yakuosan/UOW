@@ -63,7 +63,6 @@ struct HomeView: View {
                             }
                             .padding(.horizontal, 20)
                         }
-                        
                     }
                     .padding(.bottom, 120)
                 }
@@ -104,7 +103,8 @@ struct HomeView: View {
                     .environmentObject(store)
         }
         .sheet(isPresented: $showAddGame) {
-            AddGameView(myGames: $store.games)
+            AddGameView()
+                .environmentObject(store)
         }
     }
 }
@@ -123,10 +123,26 @@ struct GameCardView: View {
                     RoundedRectangle(cornerRadius: 10)
                         .fill(Color.black)
                         .frame(width: 80, height: 80)
-                    Image(systemName: game.imageName)
-                        .font(.system(size: 32))
-                        .foregroundColor(.white)
+                    if let urlStr = game.imageURL, let url = URL(string: urlStr) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image.resizable().scaledToFill()
+                            default:
+                                Image(systemName: game.imageName)
+                                    .font(.system(size: 32))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .frame(width: 80, height: 80)
+                        .clipped()
+                    } else {
+                        Image(systemName: game.imageName)
+                            .font(.system(size: 32))
+                            .foregroundColor(.white)
+                    }
                 }
+                .cornerRadius(10)
 
                 // ゲーム情報
                 VStack(alignment: .leading, spacing: 6) {
