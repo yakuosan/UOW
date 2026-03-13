@@ -4,7 +4,15 @@ import Speech
 import Combine
 
 class IrritationViewModel: ObservableObject {
+
+    // MARK: - @Published（SwiftUI が直接監視できるプロパティ）
+
     @Published var isMonitoring: Bool = false
+    @Published var score: Double = 0.0           // scoreEngine から転送
+    @Published var level: IrritationLevel = .calm // scoreEngine から転送
+    @Published var showAdviceModal: Bool = false  // responseManager から転送
+    @Published var currentAdvice: String = ""    // responseManager から転送
+
     @Published var events: [DetectionEvent] = []
     @Published var transcription: String = ""
     @Published var micPermissionGranted: Bool = false
@@ -12,7 +20,8 @@ class IrritationViewModel: ObservableObject {
     @Published var wordCount: Int = 0
     @Published var impactCount: Int = 0
 
-    // Sub-components
+    // MARK: - Sub-components
+
     let scoreEngine = IrritationScoreEngine()
     let responseManager = ResponseManager()
 
@@ -22,50 +31,44 @@ class IrritationViewModel: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
 
-    // Forwarded publishers
-    var score: Double { scoreEngine.score }
-    var level: IrritationLevel { scoreEngine.level }
-    var currentAdvice: String { responseManager.currentAdvice }
-    var showAdviceModal: Bool { responseManager.showAdviceModal }
-
     init() {
         setupBindings()
     }
 
+    // MARK: - Bindings
+
     private func setupBindings() {
-        // Forward score changes to response manager
+
+        // scoreEngine.score → viewModel.score（@Published に転送することで確実に画面更新）
+        scoreEngine.$score
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$score)
+
+        // scoreEngine.level → viewModel.level
         scoreEngine.$level
             .receive(on: DispatchQueue.main)
             .sink { [weak self] level in
+                self?.level = level
                 self?.responseManager.update(for: level)
-                self?.objectWillChange.send()
             }
             .store(in: &cancellables)
 
-        scoreEngine.$score
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-
+        // responseManager → viewModel
         responseManager.$currentAdvice
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.objectWillChange.send() }
-            .store(in: &cancellables)
+            .assign(to: &$currentAdvice)
 
         responseManager.$showAdviceModal
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.objectWillChange.send() }
-            .store(in: &cancellables)
+            .assign(to: &$showAdviceModal)
 
-        // Impact detector callback
+        // 台パン検知コールバック
         impactDetector.onImpactDetected = { [weak self] in
             self?.scoreEngine.addImpact()
             self?.addEvent(.impact)
         }
 
-        // Speech manager callbacks
+        // 暴言検知コールバック
         speechManager.onMildWord = { [weak self] word in
             self?.scoreEngine.addMildWord()
             self?.addEvent(.mildWord(word))
@@ -82,12 +85,14 @@ class IrritationViewModel: ObservableObject {
             }
         }
 
-        // Audio buffer routing
+        // マイク音声バッファを2つのコンポーネントに配信
         audioCaptureManager.onBuffer = { [weak self] buffer, _ in
             self?.impactDetector.process(buffer: buffer)
             self?.speechManager.appendBuffer(buffer)
         }
     }
+
+    // MARK: - 操作
 
     func requestPermissions() {
         AVAudioSession.sharedInstance().requestRecordPermission { [weak self] granted in
@@ -111,14 +116,14 @@ class IrritationViewModel: ObservableObject {
             try session.setActive(true)
 
             try audioCaptureManager.startCapture()
-            let format = audioCaptureManager.outputFormat
+            let format    = audioCaptureManager.outputFormat
             let inputNode = audioCaptureManager.inputNode
             try speechManager.startRecognition(inputNode: inputNode, format: format)
 
             isMonitoring = true
             print("[ViewModel] Monitoring started.")
         } catch {
-            print("[ViewModel] Failed to start monitoring: \(error)")
+            print("[ViewModel] Failed to start: \(error)")
         }
     }
 
@@ -138,6 +143,14 @@ class IrritationViewModel: ObservableObject {
         impactCount = 0
     }
 
+    func dismissModal() {
+        DispatchQueue.main.async {
+            self.showAdviceModal = false
+        }
+    }
+
+    // MARK: - イベント記録
+
     private func addEvent(_ type: EventType) {
         let event = DetectionEvent(type: type, timestamp: Date())
         DispatchQueue.main.async {
@@ -149,13 +162,6 @@ class IrritationViewModel: ObservableObject {
             case .mildWord, .severeWord: self.wordCount += 1
             case .impact:               self.impactCount += 1
             }
-        }
-    }
-
-    func dismissModal() {
-        DispatchQueue.main.async {
-            self.responseManager.showAdviceModal = false
-            self.objectWillChange.send()
         }
     }
 }
