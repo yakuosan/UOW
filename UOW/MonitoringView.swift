@@ -1,14 +1,18 @@
 import SwiftUI
+import AVFoundation
+import Speech
 
 struct MonitoringView: View {
     let game: Game?
     @StateObject private var viewModel = IrritationViewModel()
     @EnvironmentObject var store: GameStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var peakScore: Double = 0
     @State private var sessionSaved = false
     @State private var showResult = false
+    @State private var showPermissionGuide = false
 
     var body: some View {
         ZStack {
@@ -24,6 +28,13 @@ struct MonitoringView: View {
                     score: viewModel.score,
                     isMonitoring: viewModel.isMonitoring
                 )
+
+                // 警告バナー（スコア40〜70）
+                if viewModel.score >= 40 && viewModel.score <= 70 {
+                    ScoreWarningBanner(score: viewModel.score)
+                        .padding(.horizontal, 20)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
 
                 // 計測終了ボタン
                 Button {
@@ -64,13 +75,56 @@ struct MonitoringView: View {
             }
             .padding(.top, 12)
 
-            // 忠告モーダル
+            // ヒーリングミュージック再生中バー
+            if viewModel.isPlayingMusic {
+                VStack {
+                    Spacer()
+                    MusicPlayingBar()
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 12)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                .zIndex(5)
+            }
+
+            // 忠告モーダル（warning レベル）
             if viewModel.showAdviceModal {
                 AdviceModal(
                     advice: viewModel.currentAdvice,
                     level: viewModel.level,
                     onDismiss: { viewModel.dismissModal() }
                 )
+            }
+
+            // マイク権限案内オーバーレイ
+            if showPermissionGuide {
+                MicPermissionGuide(
+                    onAllow: {
+                        showPermissionGuide = false
+                        viewModel.requestPermissions()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            viewModel.startMonitoring()
+                        }
+                    },
+                    onOpenSettings: {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    },
+                    isDenied: AVAudioSession.sharedInstance().recordPermission == .denied
+                              || SFSpeechRecognizer.authorizationStatus() == .denied
+                )
+                .transition(.opacity)
+                .zIndex(20)
+            }
+
+            // 強制深呼吸モーダル（danger レベル：スコア91以上、完了するまで閉じられない）
+            if viewModel.showBreathingModal {
+                BreathingModal {
+                    viewModel.dismissBreathingModal()
+                }
+                .transition(.opacity)
+                .zIndex(10)
             }
 
             // 計測結果オーバーレイ
@@ -102,8 +156,7 @@ struct MonitoringView: View {
             }
         }
         .onAppear {
-            viewModel.requestPermissions()
-            viewModel.startMonitoring()
+            checkAndRequestPermissions()
         }
         .onReceive(viewModel.$score) { score in
             if score > peakScore { peakScore = score }
@@ -112,6 +165,51 @@ struct MonitoringView: View {
             // バックグラウンドに回った場合などのフォールバック保存
             viewModel.stopMonitoring()
             if !sessionSaved { saveSession() }
+        }
+        // 設定アプリからマイクをONにして戻ってきたとき自動で案内を閉じてスタート
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, showPermissionGuide else { return }
+            let micOK = AVAudioSession.sharedInstance().recordPermission == .granted
+            let speechOK = SFSpeechRecognizer.authorizationStatus() == .authorized
+            if micOK && speechOK {
+                withAnimation {
+                    showPermissionGuide = false
+                }
+                viewModel.requestPermissions()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    viewModel.startMonitoring()
+                }
+            }
+        }
+        // 権限が付与されたら案内を閉じる（in-appダイアログのOKを押した直後）
+        .onChange(of: viewModel.micPermissionGranted) { _, granted in
+            guard granted, showPermissionGuide else { return }
+            withAnimation {
+                showPermissionGuide = false
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                viewModel.startMonitoring()
+            }
+        }
+    }
+
+    // MARK: - 権限確認 → 案内 or 直接スタート
+    private func checkAndRequestPermissions() {
+        let micStatus = AVAudioSession.sharedInstance().recordPermission
+        let speechStatus = SFSpeechRecognizer.authorizationStatus()
+
+        if micStatus == .undetermined || speechStatus == .notDetermined {
+            // 初回：案内画面を表示してから権限リクエスト
+            showPermissionGuide = true
+        } else if micStatus == .denied || speechStatus == .denied {
+            // 拒否済み：設定を開く案内を表示
+            showPermissionGuide = true
+        } else {
+            // 既に許可済み：すぐスタート
+            viewModel.requestPermissions()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                viewModel.startMonitoring()
+            }
         }
     }
 
@@ -293,6 +391,42 @@ struct GameInfoCard: View {
     }
 }
 
+// MARK: - スコア警告バナー（40〜70）
+
+struct ScoreWarningBanner: View {
+    let score: Double
+
+    private var message: String {
+        score >= 56 ? "イライラが高まっています。深呼吸してみましょう。" : "少し注意が必要です。落ち着いて。"
+    }
+    private var bannerColor: Color {
+        score >= 56 ? Color(hex: "F5A87A") : Color(hex: "F5E6A3")
+    }
+    private var icon: String {
+        score >= 56 ? "exclamationmark.triangle.fill" : "exclamationmark.circle.fill"
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .foregroundColor(bannerColor)
+                .font(.title3)
+            Text(message)
+                .font(.subheadline)
+                .foregroundColor(.primary)
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(bannerColor.opacity(0.15))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(bannerColor.opacity(0.4), lineWidth: 1)
+        )
+        .cornerRadius(12)
+    }
+}
+
 // MARK: - 円形イライラゲージ
 
 struct IrritationCircleGauge: View {
@@ -301,6 +435,10 @@ struct IrritationCircleGauge: View {
 
     private let size: CGFloat = 220
     private let lineWidth: CGFloat = 18
+
+    @State private var pulseScale: CGFloat = 1.0
+
+    private var inCautionRange: Bool { score >= 40 && score <= 70 }
 
     var body: some View {
         ZStack {
@@ -325,7 +463,8 @@ struct IrritationCircleGauge: View {
                 )
                 .frame(width: size, height: size)
                 .rotationEffect(.degrees(-90))
-                .animation(.easeInOut(duration: 0.6), value: score)
+                .animation(.linear(duration: 0.05), value: score)
+                .scaleEffect(pulseScale)
 
             VStack(spacing: 2) {
                 Text("イライラ度")
@@ -334,7 +473,6 @@ struct IrritationCircleGauge: View {
                 Text("\(Int(score))%")
                     .font(.system(size: 52, weight: .bold, design: .rounded))
                     .foregroundColor(.primary)
-                    .animation(.easeInOut, value: score)
                 HStack(spacing: 4) {
                     Image(systemName: "mic")
                     Image(systemName: "waveform")
@@ -344,6 +482,17 @@ struct IrritationCircleGauge: View {
             }
         }
         .frame(width: size + 40, height: size + 40)
+        .onChange(of: inCautionRange) { _, inRange in
+            if inRange {
+                withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+                    pulseScale = 1.05
+                }
+            } else {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    pulseScale = 1.0
+                }
+            }
+        }
     }
 }
 

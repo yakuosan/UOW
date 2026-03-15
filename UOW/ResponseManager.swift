@@ -5,10 +5,31 @@ import Foundation
 class ResponseManager: NSObject, ObservableObject {
     @Published var currentAdvice: String = ""
     @Published var showAdviceModal: Bool = false
+    @Published var showBreathingModal: Bool = false
+    @Published var isPlayingMusic: Bool = false
 
     private var audioPlayer: AVAudioPlayer?
     private var currentLevel: IrritationLevel = .calm
     private var fadeTimer: Timer?
+
+    /// 深呼吸完了時刻（クールダウン管理）
+    private var lastBreathingCompletedAt: Date = .distantPast
+    private let breathingCooldown: TimeInterval = 10 * 60  // 10分
+
+    /// 深呼吸完了を記録（IrritationViewModel から呼ぶ）
+    func breathingCompleted() {
+        lastBreathingCompletedAt = Date()
+        showBreathingModal = false
+    }
+
+    /// 監視停止時に音楽をフェードアウトして止める
+    func reset() {
+        currentLevel = .calm
+        currentAdvice = ""
+        showAdviceModal = false
+        showBreathingModal = false
+        stopMusic()
+    }
 
     private let adviceByLevel: [IrritationLevel: [String]] = [
         .caution: [
@@ -39,17 +60,23 @@ class ResponseManager: NSObject, ObservableObject {
             currentAdvice = ""
             showAdviceModal = false
         case .caution:
-            playMusic(named: "healing_low", volume: 0.4)
-            currentAdvice = randomAdvice(for: level)
+            // 51-70: 視覚的警告のみ（音楽なし）
+            stopMusic()
+            currentAdvice = ""
             showAdviceModal = false
         case .warning:
-            playMusic(named: "healing_mid", volume: 0.7)
+            // 71-90: ヒーリング音楽スタート
+            playMusic(named: "healing_low", volume: 0.6)
             currentAdvice = randomAdvice(for: level)
-            showAdviceModal = true
+            showAdviceModal = false
         case .danger:
+            // 91-100: 音楽 + 強制深呼吸モーダル（クールダウン中は出さない）
             playMusic(named: "healing_high", volume: 1.0)
             currentAdvice = randomAdvice(for: level)
-            showAdviceModal = true
+            let elapsed = Date().timeIntervalSince(lastBreathingCompletedAt)
+            if elapsed >= breathingCooldown {
+                showBreathingModal = true
+            }
         }
 
         print("[Response] Level changed: \(previous.description) → \(level.description)")
@@ -84,15 +111,13 @@ class ResponseManager: NSObject, ObservableObject {
 
     private func loadAndPlay(url: URL, volume: Float) {
         do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
-            try session.setActive(true)
-
             audioPlayer = try AVAudioPlayer(contentsOf: url)
             audioPlayer?.delegate = self
             audioPlayer?.numberOfLoops = -1
             audioPlayer?.volume = 0
+            audioPlayer?.prepareToPlay()
             audioPlayer?.play()
+            isPlayingMusic = true
             crossfadeVolume(to: volume)
             print("[Response] Playing: \(url.lastPathComponent)")
         } catch {
@@ -124,11 +149,23 @@ class ResponseManager: NSObject, ObservableObject {
 
     private func stopMusic() {
         fadeTimer?.invalidate()
-        guard let player = audioPlayer, player.isPlaying else { return }
-        crossfadeVolume(to: 0)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-            self?.audioPlayer?.stop()
-            self?.audioPlayer = nil
+        guard let player = audioPlayer, player.isPlaying else {
+            audioPlayer = nil
+            isPlayingMusic = false
+            return
+        }
+        isPlayingMusic = false
+        // 1.5秒かけてフェードアウト
+        let step: Float = player.volume / 30   // 30ステップで0まで
+        fadeTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] timer in
+            guard let self = self, let p = self.audioPlayer else { timer.invalidate(); return }
+            if p.volume <= step {
+                p.stop()
+                self.audioPlayer = nil
+                timer.invalidate()
+            } else {
+                p.volume -= step
+            }
         }
     }
 }
@@ -138,3 +175,4 @@ extension ResponseManager: AVAudioPlayerDelegate {
         print("[Response] Audio finished playing")
     }
 }
+

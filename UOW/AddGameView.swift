@@ -8,6 +8,7 @@ struct AddGameView: View {
     @State private var searchText = ""
     @State private var showAllGenres = false
     @State private var selectedGenre: GameGenre? = nil
+    @State private var showManualEntry = false
 
     // 検索中かどうか
     private var isSearching: Bool { !searchText.isEmpty }
@@ -126,7 +127,8 @@ struct AddGameView: View {
                                         ) {
                                             store.addGame(Game(
                                                 name: game.name,
-                                                imageName: "gamecontroller.fill"
+                                                imageName: "gamecontroller.fill",
+                                                imageURL: game.imageURL.isEmpty ? nil : game.imageURL
                                             ))
                                         }
                                         if game.id != catalogGames.last?.id {
@@ -137,6 +139,22 @@ struct AddGameView: View {
                                 .background(Color.white)
                                 .cornerRadius(16)
                                 .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
+                                .padding(.horizontal, 20)
+
+                                // 手動登録ボタン
+                                Button { showManualEntry = true } label: {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "pencil.circle.fill")
+                                        Text("ゲームが見つからない場合は手動で登録")
+                                            .font(.subheadline)
+                                    }
+                                    .foregroundColor(Color(hex: "8ECFB0"))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 14)
+                                    .background(Color.white)
+                                    .cornerRadius(16)
+                                    .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
+                                }
                                 .padding(.horizontal, 20)
                             }
                         }
@@ -158,6 +176,82 @@ struct AddGameView: View {
             }
             .navigationDestination(isPresented: $showAllGenres) {
                 AllGenresView()
+            }
+            .sheet(isPresented: $showManualEntry) {
+                ManualGameEntrySheet { name in
+                    store.addGame(Game(
+                        name: name,
+                        imageName: "gamecontroller.fill"
+                    ))
+                    showManualEntry = false
+                }
+            }
+        }
+    }
+}
+
+// MARK: - 手動登録シート
+
+struct ManualGameEntrySheet: View {
+    let onAdd: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var gameName = ""
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color(hex: "FAF7F2").ignoresSafeArea()
+                VStack(spacing: 28) {
+                    // アイコン
+                    ZStack {
+                        Circle()
+                            .fill(Color(hex: "EEF9F4"))
+                            .frame(width: 80, height: 80)
+                        Image(systemName: "gamecontroller.fill")
+                            .font(.system(size: 32))
+                            .foregroundColor(Color(hex: "8ECFB0"))
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("ゲーム名")
+                            .font(.caption.bold())
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 4)
+
+                        TextField("例: マリオカート、ポケモンSV", text: $gameName)
+                            .font(.body)
+                            .padding(14)
+                            .background(Color.white)
+                            .cornerRadius(12)
+                            .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+                    }
+                    .padding(.horizontal, 24)
+
+                    Text("Steamにないゲームや、コンシューマー機のゲームはこちらから登録できます。")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 28)
+
+                    Spacer()
+                }
+                .padding(.top, 36)
+            }
+            .navigationTitle("手動でゲームを登録")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("登録") {
+                        let trimmed = gameName.trimmingCharacters(in: .whitespaces)
+                        guard !trimmed.isEmpty else { return }
+                        onAdd(trimmed)
+                    }
+                    .fontWeight(.bold)
+                    .disabled(gameName.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("キャンセル") { dismiss() }
+                }
             }
         }
     }

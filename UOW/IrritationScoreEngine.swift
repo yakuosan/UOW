@@ -35,8 +35,9 @@ class IrritationScoreEngine: ObservableObject {
     private let severeWordScore: Double = 15.0
     private let impactScore: Double = 10.0
 
-    // Decay rate per second
-    private let decayRate: Double = 0.3
+    // 0.1秒ごとに0.03ずつ減衰（= 毎秒0.3と同じ速度、でも10倍滑らか）
+    private let decayRate: Double = 0.03
+    private let timerInterval: TimeInterval = 0.1
 
     private var decayTimer: Timer?
 
@@ -49,7 +50,7 @@ class IrritationScoreEngine: ObservableObject {
     }
 
     private func startDecayTimer() {
-        decayTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        decayTimer = Timer.scheduledTimer(withTimeInterval: timerInterval, repeats: true) { [weak self] _ in
             self?.applyDecay()
         }
     }
@@ -88,10 +89,10 @@ class IrritationScoreEngine: ObservableObject {
     private func updateLevel() {
         let newLevel: IrritationLevel
         switch score {
-        case 0...30:   newLevel = .calm
-        case 31...60:  newLevel = .caution
-        case 61...80:  newLevel = .warning
-        default:       newLevel = .danger
+        case 0...50:   newLevel = .calm     // 平常（無反応）
+        case 51...70:  newLevel = .caution  // 注意（視覚的警告のみ）
+        case 71...90:  newLevel = .warning  // 警告（ヒーリング音楽）
+        default:       newLevel = .danger   // 危険（音楽 + 強制深呼吸）
         }
         if newLevel != level {
             level = newLevel
@@ -105,3 +106,4 @@ class IrritationScoreEngine: ObservableObject {
         }
     }
 }
+
