@@ -29,8 +29,8 @@ struct MonitoringView: View {
                     isMonitoring: viewModel.isMonitoring
                 )
 
-                // 警告バナー（スコア40〜70）
-                if viewModel.score >= 40 && viewModel.score <= 70 {
+                // 警告バナー（スコア40以上）
+                if viewModel.score >= 40 {
                     ScoreWarningBanner(score: viewModel.score)
                         .padding(.horizontal, 20)
                         .transition(.move(edge: .top).combined(with: .opacity))
@@ -397,13 +397,27 @@ struct ScoreWarningBanner: View {
     let score: Double
 
     private var message: String {
-        score >= 56 ? "イライラが高まっています。深呼吸してみましょう。" : "少し注意が必要です。落ち着いて。"
+        switch score {
+        case 0..<56:  return "少し注意が必要です。落ち着いて。"
+        case 56..<71: return "イライラが高まっています。深呼吸してみましょう。"
+        case 71..<91: return "かなりイライラしています。一度立ち止まって。"
+        default:      return "⚠️ 危険な状態です。今すぐ深呼吸してください。"
+        }
     }
     private var bannerColor: Color {
-        score >= 56 ? Color(hex: "F5A87A") : Color(hex: "F5E6A3")
+        switch score {
+        case 0..<56:  return Color(hex: "F5E6A3")
+        case 56..<71: return Color(hex: "F5A87A")
+        case 71..<91: return Color(hex: "E87575")
+        default:      return Color(hex: "C0392B")
+        }
     }
     private var icon: String {
-        score >= 56 ? "exclamationmark.triangle.fill" : "exclamationmark.circle.fill"
+        switch score {
+        case 0..<56:  return "exclamationmark.circle.fill"
+        case 56..<91: return "exclamationmark.triangle.fill"
+        default:      return "exclamationmark.octagon.fill"
+        }
     }
 
     var body: some View {
