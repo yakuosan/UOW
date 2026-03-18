@@ -11,7 +11,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		DABE561F2F59672F00DAC5D0 /* Exceptions for "UOW" folder in "UOW" target */ = {
+		DAAF388D2F69D4D700D37CBD /* Exceptions for "UOW" folder in "UOW" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -24,7 +24,7 @@
 		DAC90C012F44E151005E6B34 /* UOW */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				DABE561F2F59672F00DAC5D0 /* Exceptions for "UOW" folder in "UOW" target */,
+				DAAF388D2F69D4D700D37CBD /* Exceptions for "UOW" folder in "UOW" target */,
 			);
 			path = UOW;
 			sourceTree = "<group>";
@@ -263,7 +263,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = MT5KB3ZJ7L;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -298,7 +298,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = MT5KB3ZJ7L;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;

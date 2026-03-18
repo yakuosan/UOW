@@ -421,14 +421,15 @@ struct ScoreWarningBanner: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
                 .foregroundColor(bannerColor)
                 .font(.title3)
             Text(message)
                 .font(.subheadline)
                 .foregroundColor(.primary)
-            Spacer()
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)

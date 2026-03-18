@@ -4,5 +4,9 @@
 <dict>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>イライラ度を計測するため、ゲーム中の音声（暴言・台パン）をマイクで検知します。</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>ゲーム中の暴言をリアルタイムで検知し、イライラ度のスコアに反映するために音声認識を使用します。</string>
 </dict>
 </plist>
